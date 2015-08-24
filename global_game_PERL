@@ -1,0 +1,102 @@
+use HTML::TagParser;
+use HTML::Entities;
+use LWP::Simple;
+use Try::Catch;
+
+open IL, ">game_expo.txt";
+print IL "s.no|Link|Company Name1|Company Name2|Company Name3|website|address|product|about_us\n";
+close IL;
+
+my $count = 1;
+
+$url1 = "http://www.globalgamingexpo.com/en/Show-Info/Exhibitors/?lo=1&rpp=100&startRecord=1#";
+
+my $p = HTML::TagParser->new($url1);
+my $pg_count = $p->getElementsByClassName("resultsMessage");
+$pg_count = $pg_count->innerText();
+$pg_count =~m/of\s*([^>]*?)\s*results/is;
+$pg_count = $1;
+
+print $pg_count;
+
+
+for ($i=0; $i<$pg_count + 1; $i=$count){
+
+$url = "http://www.globalgamingexpo.com/en/Show-Info/Exhibitors/?lo=1&rpp=100&startRecord=$i#";
+my $html = HTML::TagParser->new($url);
+my $body = $html->getElementById("searchResultsList");
+$body = $body->subTree();
+
+my @page_data = $body->getElementsByClassName("name");
+foreach my $info (@page_data){
+	
+	my $name = $info->innerText();
+	my $link = $info->subTree();
+	$link = $link->getElementsByTagName("a");
+	$link = $link->getAttribute( "href" );
+	$link = "http://www.globalgamingexpo.com$link";
+	
+	
+	#print "$count|$link|$name\n";
+	my $answer = main($link);
+	
+	print "$count|$link|$name|$answer\n";
+	
+	
+	open IL,">>game_expo.txt";
+	print IL "$count|$link|$name|$answer\n";
+	close IL;
+	
+	$count = $count + 1;
+	
+	
+}
+
+}
+
+sub main()
+{
+	
+	my $urls = shift;
+	
+	#$urls = "http://www.globalgamingexpo.com/en/Exhibitors/867465/SGS-North-America-Inc";
+my $page = HTML::TagParser->new($urls);
+
+
+my $name2 = "";my $name3 = "";my $website = "";my $address = "";my $product = "";my $about_us;
+
+$name2 = $page->getElementsByClassName("exhibitorName");
+$name2 = $name2->innerText();
+
+try {$name3 = $page->getElementsByClassName("fn org");$name3 = $name3->innerText();}
+catch{$name3="";};
+#print $name3;
+
+
+try {$website = $page->getElementsByClassName("url");$website = $website->innerText();}
+catch{$website="";};
+#print $website;
+
+
+try {$address = $page->getElementsByClassName("adr");$address = $address->innerText();$address =~s/[\r\n]+/\n/g;$address =~s/\s{2,}/\#/g;}
+catch{$address = "";};
+#print $address;
+
+my $a = get("$urls");
+
+my $product = "";
+try {while($a =~m/<dd[^>]*?>\s*([^>]*?)\s*<ul>/igs){$product ="$product# $1";}}
+catch {$product = "";};
+print $product;
+
+try {$about_us = $page->getElementsByClassName("description wrapWhiteSpace");$about_us = $about_us->innerText();$about_us =~s/[\r\n]/# /igs;}
+catch{$about_us = "";};
+#print $about_us;
+
+my $r = "$name2|$name3|$website|$address|$product|$about_us";
+
+return $r;
+
+	
+}
+
