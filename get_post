@@ -1,0 +1,137 @@
+
+
+#********* Declaring Modules ***********#
+use HTTP::Cookies;
+use LWP::Simple;
+use LWP::Simple 'getstore';
+use strict;
+use Encode;
+use HTML::Entities;
+use URI::URL;
+use strict;
+use DBI;
+use URI::Escape;
+my $ua=LWP::UserAgent->new();
+$ua->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.2.12) Gecko/20101026 Firefox/3.6.12 (.NET CLR 3.5.30729)");
+$ua->max_redirect(0);
+my $cookie_jar = HTTP::Cookies->new(file=>$0."_cookie.txt",autosave => 1,);                    
+$ua->cookie_jar($cookie_jar);
+$cookie_jar->save;
+
+#********* Declaring Modules ***********#
+	open FL,">aacr_output.txt";
+	print FL "Date\tTitle\tLink\n";
+	close FL;
+	
+	my $url ="http://www.aacr.org";
+	my $con=getcont($url,"","","GET");
+	
+	open LL,">aacr_content.html";
+	print LL $con;
+	
+	close LL;
+	
+if($con=~m/id="WebPartWPQ1"([\w\W]*?)<\/section>/is)
+{
+my $con1=$1;
+# Title and Link
+while($con1=~m/(<li[\w\W]*?<\/li>)/igs)
+{
+print $1;
+my $con2=$1;
+my($link,$title,$date);
+if($con2=~m/href="([^>]*?)"[^>]*?>[^>]*?</is)
+{
+print $1;
+$link = "http://www.aacr.org$1";
+$link=trim($link);
+}
+if($con2=~m/href="[^>]*?"[^>]*?>([^>]*?)<\/a>/is)
+{
+$title=trim($1);
+}
+
+print "loop\n";
+open FL, ">>aacr_output.txt";
+print FL "$link\t$title\n";
+close FL;
+}
+}
+
+	
+sub trim()
+{
+ my $val1=shift;
+	$val1=~s/<[^>]*?>/ /igs;
+	$val1=~s/\s+/ /igs;
+	$val1=~s/\\u002f/\\/igs;
+	$val1=~s/\\u200b//igs;
+	return $val1;
+}	
+	
+	
+	
+	
+sub getcont()
+{
+    my $ur=shift;
+    my $cont=shift;
+    my $ref=shift;
+    my $method=shift;
+    my $count=0;	
+	#sleep(int(rand(25)));
+	# sleep(15);
+    netfail:
+    my $request=HTTP::Request->new("$method"=>$ur);
+    $request->header("Content-Type"=>"text/html; charset=utf-8");
+	 $request->header("Cookie"=>"SearchSession=5617f585%2D1e3e%2D4135%2Db676%2D9a9a99da9666; __utma=223743883.1400027607.1437048236.1437137576
+.1437364873.4; __utmz=223743883.1437048236.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); __atuvc
+=5%7C28%2C3%7C29; WSS_FullScreenMode=false; __utmc=223743883; __atrfs=ab/|pos/|tot/|rsi/55ac780500000000
+|cfc/|hash/0|rsiq/|fuid/f93aff86|rxi/|rsc/|gen/4|csi/|dr/");
+
+    if($ref ne '')
+	{
+		$request->header("Referer"=>"$ref");
+    }
+    if(lc $method eq 'post')
+    {
+		$request->content($cont);
+    }
+    my $res=$ua->request($request);
+    $cookie_jar->extract_cookies($res);
+    $cookie_jar->save;
+    $cookie_jar->add_cookie_header($request);
+    my $code=$res->code;
+    #print"\n $code";
+    if($code==200)
+    {
+		my $content=$res->content();
+	return $content;
+    }
+    elsif($code=~m/50/is)
+    {
+		print"\n $count Net Failure";
+		$count++;
+		if($count==4)
+		{
+			next;
+		}
+		goto netfail;
+    }
+    elsif($code=~m/30/is)
+	{
+		print "CODE::$code\n";
+		my $loc=$res->header("Location");
+		$loc=URI::URL->new_abs($loc,$ur);
+		print "$loc\n";
+		#return $loc;
+    	getcont($loc,'','','GET');
+	}
+    elsif($code=~m/40/is)
+    {
+        print "\n URL Not found";
+    }
+}
+
+	
+	
